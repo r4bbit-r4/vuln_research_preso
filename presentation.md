@@ -22,7 +22,7 @@
 - Webes felület nézegetése
 - Reverse engineering
 
----
+---v
 
 ### Firmware vizsgálat
 
@@ -43,7 +43,7 @@ Firmware "kibontása" (`binwalk` / `unblob`), majd az `init` folyamat vizsgálat
 ...
 ```
 
----
+---v
 
 ### Webes felület vizsgálata
 
@@ -194,7 +194,7 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 
 ---
 
-### Overview
+### Összefoglaló
 
 <div class="mermaid">
   <pre>
@@ -225,10 +225,217 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 
 ---
 
-## YuNoHost
-### **Fail?**
+## YUNoHost
+### **Fail (???)**
 
-TODO
+---
+
+### Target választás
+
+- Régen a home infra alapja
+- Open source
+- Pythonban :)
+- Egyszer sikerült megölni
+
+---
+
+### Target megismerése
+
+- Dokumentáció (elég jó!)
+- Kódvizsgálat (0-ik kör)
+- Local instance (debugger miatt)
+
+---
+
+### Dokumentáció
+
+- Moulinette - Actionmap server (API)
+- Yunohost - Users, services, etc
+- SSOwat - SSO
+- Yunohost-portal - Web interface
+
+> https://doc.yunohost.org/en/dev/core/architecture
+
+---v
+
+### Moulinette
+
+![alt text](static/mouliette.png)
+
+---v
+
+### Yunohost
+
+![alt text](static/yunohost.png)
+
+---v
+
+### Overview
+
+<div class="mermaid">
+  <pre>
+    flowchart TB
+        subgraph YUNoHost
+            direction BT
+            subgraph SSO
+                direction LR
+                SSOwat
+            end
+            subgraph WEB/API
+                direction LR
+                Yunohost-portal --> Moulinette
+            end
+            subgraph Core
+                direction LR
+                Yunohost
+            end
+        end
+        Core --> SSO
+        Core --> WEB/API
+        SSO --> WEB/API  
+  </pre>
+</div>
+
+---
+
+### Kódvizsgálat
+
+A [yunohost](https://github.com/YunoHost/yunohost) repo `__init__.py` fájlból:
+
+```python
+def api(debug, host, port, actionsmap):
+  ...
+  actionsmap = actionsmap or "share/yunohost/actionsmap.yml"
+  ...
+  # FIXME : someday, maybe find a way to disable 
+  # route /postinstall if postinstall already done ...
+  ret = moulinette.api(
+      host=host,
+      port=port,
+      actionsmap=actionsmap,
+      ...
+  )
+```
+
+---v
+
+### Kódvizsgálat
+
+A [moulinette](https://github.com/YunoHost/moulinette) repo `api.py` fájlból:
+
+```python [ | 4,10,11,13]
+class Interface:
+  ...
+  def __init__(self, routes, actionsmap, origins, umask):
+    actionsmap = ActionsMap(actionsmap,ActionsMapParser())
+    ...
+    app = Bottle(autojson=True)
+    ...
+    # Install plugins
+    ...
+    actionsmapplugin = _ActionsMapPlugin(actionsmap)
+    app.install(actionsmapplugin)
+    ...
+    self.authenticate = actionsmapplugin.authenticate
+    ...
+```
+
+---v
+
+### Kódvizsgálat
+
+```python
+class _ActionsMapPlugin:
+  ...
+  def setup(self, app):
+    ...
+    app.route("/login", name="login",
+        method="POST", callback=self.login, 
+        skip=[filter_csrf, "actionsmap"],
+    )
+    ...
+    # Append routes from the actions map
+    for m, p in self.actionsmap.parser.routes:
+        app.route(p, method=m, callback=self.process)
+```
+
+---v
+
+### Kódvizsgálat
+
+```python
+def login(self):
+  params = request.params
+  ...
+  else:
+    if "credentials" in params:
+      ...
+    elif "username" in params and "password" in params:
+        ...
+    profile = params.get("profile", ...)
+  ...
+  authenticator = self.actionsmap.get_authenticator(profile)
+  ...
+```
+
+---v
+
+### Kódvizsgálat
+
+```python
+def get_authenticator(self, auth_method):
+  if auth_method == "default":
+      auth_method = self.default_authentication
+  ...
+  mod = f"{self.namespace}.authenticators.{auth_method}"
+  ...
+  try:
+    mod = import_module(mod)
+```
+
+---v
+
+### Kódvizsgálat
+
+```python
+def import_module(name, package=None):
+
+  level = 0
+  if name.startswith('.'):
+    if not package:
+      raise TypeError("...")
+    for character in name:
+      if character != '.':
+        break
+      level += 1
+
+  return _bootstrap._gcd_import(name[level:], package, level)
+```
+
+---
+
+### Összefoglaló
+
+- Modul `import` primitív (?)
+- Önmagában semmire se jó
+- Kéne egy `write` primitív!
+- `RCE` (?)
+
+---
+
+### Tanulságok
+
+- Rengeteget segített a local instance!
+- `breakpoint` többszálas python programban
+- Később visszamenni korábbi "találatokhoz"
+
+> `TODO` - Videót berakni ide!
+
+---
+
+### Shodan
+
+![alt text](static/yunohostshodan.png)
 
 ---
 
@@ -256,16 +463,176 @@ Végül nem is a router lett a fő célpont
 
 ### Target megismerése
 
-- Gyors ismerkedés
+- Firmware vizsgálat
 - Alkalmazása beállítása
 - Reverse engineering
 - Firmware vizsgálat
 
 ---
 
-### Target megismerése
+### Firmware vizsgálat
 
-Lehallgattam a 
+Van [letölthető](https://www.tp-link.com/us/support/download/archer-ax23/#Firmware) firmware!
+
+```bash
+➜ tree -L 3 extractions/
+extractions/
+├── ax23.bin
+└── ax23.bin.extracted
+    ├── 2014
+    │   └── Linux_Kernel_Image.bin
+    └── 2F65C2
+        └── squashfs-root
+```
+
+A `binwalk` szépen kibontja
+
+---v
+
+### Firmware vizsgálat
+
+`OpenWRT` alapú!
+
+```bash
+➜ cat etc/openwrt_version
+12.09-rc1
+```
+
+---v
+
+### Firmware vizsgálat
+
+Az `init` is egészen egyszerű:
+
+```bash
+➜ cat etc/init.d/rcS
+...
+run_scripts() {
+  for i in /etc/rc.d/$1*; do
+    ...
+  done | $LOGGER
+}
+...
+if [ "$1" = "S" -a "$foreground" != "1" ]; then
+	run_scripts "$1" "$2" &
+...
+```
+
+---v
+
+### Firmware vizsgálat
+
+```bash
+➜ ls etc/rc.d/ | wc -l
+99
+
+➜ ls etc/rc.d/ | rg cloud
+K60cloud_brd
+S98cloud_brd
+S99cloud_client
+S99cloud_https
+```
+
+---v
+
+### Firmware vizsgálat
+
+A `cloud_client` szépen értelmezhető!
+
+![alt text](static/cloudclient.png)
+
+---
+
+### Alkalmazás beállítása
+
+- Emulátorban nem működött
+- Root-olni kellett a telómat
+- SSH port-forward a pentest gépre
+
+---v
+
+### Alkalmazás beállítása
+
+Samsung telefonokhoz [odin](https://xdaforums.com/t/rooting-a-samsung-device-using-magisk-and-odin-2026-updated.4594475/). Linux alatt Windows VM-ben is *működött*! (USB forward)
+
+![alt text](static/odin.png)
+
+**NE** próbálkozzunk Xiaomi telefonnal ...
+
+---v
+
+### Alkalmazás beállítása
+
+<div class="mermaid">
+  <pre>
+    flowchart TB
+    subgraph HomeLAN
+        A[Phone]
+        B[Laptop]
+    end
+    subgraph WorkInfra
+        D[Burp]
+    end
+    A --Proxy--> B
+    HomeLAN --VPN-->Internet
+    Internet --VPN-->WorkInfra
+    HomeLAN --SSHForward--> WorkInfra 
+  </pre>
+</div>
+
+---
 
 ### Reverse engineering
+
+- Nulla dokumentáció :( <!-- .element: class="fragment" data-fragment-index="1" -->
+- Heteket töltöttem vele!! <!-- .element: class="fragment" data-fragment-index="2" -->
+
+---v
+
+### Reverse engineering
+
+Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index="1" -->
+
+![alt text](static/pleading.png) <!-- .element: class="fragment" data-fragment-index="2" -->
+
+---
+
+### Összefolglaló
+
+- Az eszköz meghalt (RIP)
+- Nem vettem újat ...
+
+---
+
+## Frappe
+### **Fail**
+
+---
+
+### Target választás
+
+- Láttam, hogy sok a CMS vuln
+- "Na MaJd Én Is SzÍjJeLhAcKoLoM"
+- Több célpont közül válaszottam (open source)
+- Frappe (python, értelmezhető kód)
+
+---
+
+### Target megismerése
+
+
+
+
+
+
+
+
+
+
+
+---
+
+![alt text](static/fuckthis.jpg)
+
+---
 
