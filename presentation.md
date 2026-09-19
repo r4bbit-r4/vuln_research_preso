@@ -602,6 +602,11 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 - Az eszköz meghalt (RIP)
 - Nem vettem újat ...
 
+### Tanulságok
+
+- A tanult skillek hasznosak máshol!
+- Telefon rooting, SSH forwarding, stb
+
 ---
 
 ## Frappe
@@ -611,6 +616,7 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 
 ### Target választás
 
+- Csúfos fail után valami barátibb
 - Láttam, hogy sok a CMS vuln
 - "Na MaJd Én Is SzÍjJeLhAcKoLoM"
 - Több célpont közül válaszottam (open source)
@@ -620,15 +626,159 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 
 ### Target megismerése
 
+- Repo klónozása
+- Az `init` logika értelmezése
+- "Alkalmazás" koncepció vizsgálata
+- Végpont definíciók azonosítása
 
+---v
 
+### Init logika
 
+Az `__init__.py` fájlból:
 
+```python
+def init(...):
+  ...
+  setup_module_map(include_all_apps=not 
+            (is_request or is_job or frappe.flags.in_migrate))
+  ...
+```
 
+---v
 
+### Init logika
 
+Az `__init__.py` fájlból:
 
+```python
+def setup_module_map(include_all_apps: bool = True) -> None:
+  ...
+  if not app_modules:
+    app_modules = {}
+    ...
+    if include_all_apps:
+      apps = get_all_apps(with_internal_apps=True)
+    else:
+      apps = get_installed_apps(_ensure_on_bench=True)
+    ...
+```
 
+---v
+
+### Init logika
+
+```python
+def get_all_apps(with_internal_apps=True, sites_path=None):
+  ...
+  apps = get_file_items(os.path.join(sites_path, "apps.txt"), raise_not_found=True)
+  ...
+  return apps
+```
+
+---v
+
+### Alkalmazás koncepció
+
+A [dokumentáció](https://docs.frappe.io/framework/user/en/basics/apps) alapján:
+
+- A Frappe app is a *python package* that uses the Frappe framework. 
+- Frappe apps live in a directory called `apps` in ... 
+- A Frappe app should have an entry in `apps.txt`.
+
+---v
+
+### Alkalmazás koncepció
+
+- Az alkalmazások egyediek
+- Egyetlen alkalmazás van, amely minden Frappe instance része. A `Frappe`!
+
+---
+
+### Végpont definíciók
+
+Az `app.py` fájlból:
+
+```python
+def serve(port=8000, ...):
+  global application, _site, _sites_path
+  ...
+  run_simple(
+    bind_addr or os.environ.get("FRAPPE_BIND_ADDR") ...,
+    int(port),
+    application,
+    ...
+  )
+```
+
+---v
+
+### Végpont definíciók
+
+Az `app.py` fájlból:
+
+```python
+@Request.application
+def application(request: Request):
+  ...
+  try:
+    init_request(request)
+    validate_auth()
+    ...
+    elif request.path.startswith("/api/"):
+      response = frappe.api.handle(request)
+    ...
+```
+
+---v
+
+### Végpont definíciók
+
+Az `api/__init__.py` fájlból:
+
+```python
+def handle(request: Request):
+  ...
+  try:
+    endpoint, arguments = API_URL_MAP.bind_to_environ(request.environ).match()
+  ...
+```
+
+*Centralizált implementáció!*
+
+---v
+
+### Végpont definíciók
+
+Az `api/v2.py` fájlból:
+
+```python
+url_rules = [
+  ...
+  Rule("/discovery", methods=["GET"], endpoint=discovery.root),
+  Rule("/discovery/search", methods=["GET"],
+    endpoint=lambda: discovery.search(frappe.form_dict.get("q")),
+  ),
+  Rule("/discovery/method", methods=["GET"], endpoint=discovery.methods),
+  ...
+```
+
+---
+
+### Összefoglaló
+
+- Centralizált mechanizmusok
+- Jól meggondolt megoldások
+- Rengeteg idő (~3hét / 1hónap)
+- Feladtam ...
+
+---
+
+### Tanulságok
+
+- Több célpont esetén az ismertebbet támadni
+- Meg kell tanulni feladni ...
+- Nem kötelező tovább folytatni!
 
 ---
 
@@ -636,3 +786,81 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 
 ---
 
+## Micropie
+### **FAIL(?)**
+
+![alt text](static/micropie.png)
+
+---
+
+### Target választás
+
+- Már megszállottam kerestem őket ...
+- Véletlen szembejött velem
+- Python
+- Single-file framework
+
+---
+
+### Target megismerése
+
+- Fájl megnyitása github-on
+- Olvasás ...
+
+---
+
+### Végpontok
+
+```python [ | 10-11]
+class App:
+  ...
+  async def _asgi_app_http(...):
+    ...
+    # Routing
+    path: str = scope["path"].lstrip("/")
+    parts: List[str] = path.split("/") if path else []
+    if hasattr(request, "_route_handler"):
+      func_name: str = request._route_handler
+    else:
+      func_name: str = parts[0] if parts else "index"
+      if func_name.startswith("_") or func_name.startswith("ws_"):
+        await _early_exit(404, "404 Not Found")
+          return
+    ...
+```
+
+---v
+
+### Végpontok
+
+```python [ | 5, 9]
+...
+if not request.path_params:
+    request.path_params = parts[1:] if len(parts) > 1 else []
+
+... = self._resolve_route_handler(func_name)
+index_handler, _ = self._resolve_route_handler("index")
+...
+# Execute handler
+try:
+    result = ( await handler(*func_args, **func_kwargs)
+    ...
+```
+
+---
+
+### Összefoglaló
+
+- Blocklist
+- Nem találtam bypass módszert
+- De szerintem nem lehetetlen!
+- Impact?
+
+---
+
+### Tanulságok
+
+- Időről időre erre is vissza kéne nézni (?)
+- Kicsit projekt, nagy fun! :)
+
+---
