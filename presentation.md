@@ -226,7 +226,7 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 ---
 
 ## YUNoHost
-### **Fail (???)**
+###  `Fail (???)`
 
 ---
 
@@ -440,7 +440,7 @@ def import_module(name, package=None):
 ---
 
 ## TL-Archer AX23 Router
-### **Fail**
+### `Fail (?)`
 
 ---
 
@@ -602,6 +602,8 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 - Az eszköz meghalt (RIP)
 - Nem vettem újat ...
 
+---
+
 ### Tanulságok
 
 - A tanult skillek hasznosak máshol!
@@ -610,7 +612,7 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 ---
 
 ## Frappe
-### **Fail**
+### `Fail`
 
 ---
 
@@ -787,7 +789,7 @@ url_rules = [
 ---
 
 ## Micropie
-### **FAIL(?)**
+### `FAIL(?)`
 
 ![alt text](static/micropie.png)
 
@@ -864,3 +866,304 @@ try:
 - Kicsit projekt, nagy fun! :)
 
 ---
+
+## Directus
+### `File write`
+
+---
+
+### Target választás
+
+- Munkahelyi projekt
+- Open source / Javascript
+- 38k+ github star
+
+---
+
+### Target megismerése
+
+- Projekt során nincs account
+- Unauth hibák keresése
+- Végpontok és service-ek
+- Auth bypass keresése
+
+---
+
+### Végpontok / Service-ek
+
+Az `api/src/controllers/files.ts` fájlból:
+
+```js [ | 1,3,9]
+router.use(checkIsLocked('files'));
+router.get(
+	'/:pk',
+	...
+);
+```
+
+URL formátum: `/files/<pk>`
+
+---v
+
+### Végpontok / Service-ek
+
+```js [ | 4-7,9]
+router.use(checkIsLocked('files'));
+router.get(
+	'/:pk',
+	asyncHandler(async (req, res, next) => {
+		const service = new FilesService({
+			accountability: req.accountability,
+			schema: req.schema,
+		});
+		record = await service.readOne(req.params['pk']!,...);
+		res.locals['payload'] = { data: record || null };
+		return next();
+	}),
+	respond,
+);
+```
+
+---v
+
+### Végpontok / Service-ek
+
+<div class="mermaid">
+  <pre>
+    sequenceDiagram
+    Browser->>Directus: Request
+    Directus--> EndpointHandler:
+    Note over EndpointHandler: Preprocessing
+    EndpointHandler->> Service:
+    Note over Service: ???
+  </pre>
+</div>
+
+---
+
+### Auth
+
+```javascript [|2-5]
+export type Accountability = {
+	role: string | null;
+	roles: string[];
+	user: string | null;
+	admin: boolean;
+	app: boolean;
+	share?: string;
+	ip: string | null;
+	userAgent?: string;
+	origin?: string;
+	session?: string;
+};
+```
+
+---v
+
+### Auth
+
+```js [|3-4,11-12]
+const extractToken: RequestHandler = (req, _res, next) => {
+ 
+  if (req.headers && req.headers.authorization) {
+  const parts = req.headers.authorization.split(' ');
+  
+  if (parts.length === 2 && parts[0]!.lower() === 'bearer') {
+	  ...
+	  token = parts[1]!;
+  }
+  ...
+  req.token = token;
+  next();
+ }
+```
+
+---v
+
+### Auth
+
+```js [|3-4,7-8]
+export const handler = async (req, res, next, ) => {
+	...
+  const defAcc: Accountability = 
+    createDefaultAccountability({ ip: getIPFromReq(req) });
+    ...
+	try {
+		req.accountability = 
+      await getAccountabilityForToken(req.token, defAcc);
+	} catch (err) {
+		...
+	}
+	return next();
+};
+```
+
+---v
+
+### Auth
+
+```js
+const service = new FilesService({
+  accountability: req.accountability,
+  schema: req.schema,
+});
+```
+
+---v
+
+### Auth
+
+1. `Authorization` header
+2. `Bearer` token
+3. `getAccountabilityForToken(token)`
+4. `FileService(accountability)` 
+
+---v
+
+### Auth
+
+<div class="mermaid">
+  <pre>
+    sequenceDiagram
+    Browser ->> Directus:
+    Note over Directus: Accountability
+    Directus--> EndpointHandler: 
+    EndpointHandler->>Service: Instantiate(accountability)
+    Note over EndpointHandler: Preprocessing
+    EndpointHandler->>Service: Invoke
+    Note over Service: Acc. check
+  </pre>
+</div>
+
+---
+
+### !Auth
+
+`multipart/form-data` -> `File` object
+
+```javascript
+router.post(
+	'/apply',
+	asyncHandler(schemaMultipartHandler),
+	asyncHandler(async (req, res, next) => {
+		...
+	}),
+	respond,
+);
+```
+
+---v
+
+### !Auth
+
+Komplex adatfeldolgozás `Service` hívás előtt!
+
+```javascript [|6,10]
+onst schemaMultipartHandler: RequestHandler = (req, res, next) => {
+	...
+	busboy.on('file', async (_, fileStream, { mimeType }) => {
+    ...
+    if {...}
+      upload = parseJSON(uploadedString);
+      ...
+    } else {
+      ...
+      upload = await loadYaml(uploadedString);
+  ...
+```
+
+---
+
+### Vuln
+
+Keresendő: `asyncHandler\(.*\),`
+
+```javascript
+router.patch(
+	'/:pk',
+	asyncHandler(multipartHandler),
+	asyncHandler(async (req, res, next) => {
+		const service = new FilesService({
+	...
+);
+```
+
+---v
+
+ 
+### Vuln
+
+```javascript [|3-4|6-7|9|11|13]
+func multipartHandler: RequestHandler = (req, res, next) => {
+  ...
+  const busboy = Busboy(... )
+  let payload: any = {};
+  ...
+  busboy.on('field', (fieldname, val) => { ...
+                                payload[fieldname] = val;
+  ...
+  busboy.on('file', ...
+    ...
+    payload.filename_download ||= filename;
+    ...
+    const primaryKey = await FilesService.uploadOne(...);
+  ...
+```
+
+
+---v
+
+<pre class="r-stretch"><code class="language-javascript" data-trim data-line-numbers="|1-4|6-9|12-18|21|22-23">
+if (primaryKey) { db_data = ( ... this.knex, 
+                        ... where({ id: primaryKey })...
+...
+const metadata = { ...(db_data ?? {}), ...clone(payload) };
+...
+const isReplacement = db_data !== null && 
+                          primaryKey !== undefined;
+if (!isReplacement) { 
+          primaryKey = await this.createOne(metadata, ...);}
+
+...
+const ext = path.extname(metadata.filename_download!) ...
+metadata.filename_disk ||= primaryKey + (fileExtension || '');
+
+if (... path.extname(metadata.filename_disk!) !== ext)
+    metadata.filename_disk = primaryKey + (fileExtension || ''); }
+...
+const tempFilenameDisk = 'temp_' + metadata.filename_disk;
+
+...
+try {...disk.write(tempFilenameDisk, stream, metadata.type);...
+if (isReplacement === true) 
+            { await this.updateOne(primaryKey, metadata );
+</code></pre>
+
+---v
+
+### Vuln
+
+<div class="mermaid">
+  <pre>
+    sequenceDiagram
+    Browser ->> Directus:
+    Note over Directus: Accountability
+    Directus--> EndpointHandler: 
+    EndpointHandler->>Service: Instantiate(accountability)
+    Note over EndpointHandler: Preprocessing
+    EndpointHandler->>Service: Invoke
+    rect rgb(255,150,150)
+    Note over Service: Vuln
+    end
+    Note over Service: Acc. check
+  </pre>
+</div>
+
+---
+
+### Összefoglaló
+
+- "Majdnem" arbitrary file write
+- [CVE-2025-55746](https://github.com/directus/directus/security/advisories/GHSA-mv33-9f6j-pfmc) (CVSS 9.8)
+- Szikra az utolsó utáni pillanatban
+- A korábbi kutatások ide vezettek
