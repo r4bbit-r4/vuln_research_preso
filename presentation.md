@@ -1,3 +1,107 @@
+## Sérülékenység-kutatás
+### *Történetek, tanácsok, gondolatok*
+
+**A "HOBBI"**<!-- .element: class="fragment" data-fragment-index="1" -->
+
+---
+
+### TOC
+
+- Bemutatkozás
+- Előadás motiváció
+- A kutatásról röviden
+- Projektek bemutatása
+- Módszertan
+- Összefoglaló
+
+---
+
+### `$ whoami`
+
+- IT security kutató
+- ~6 éve
+- BME
+- [CrySys Lab](https://www.crysys.hu/)
+- Kocka
+- 4 éve sérülékenység-kutató
+
+---
+
+### Motiváció
+
+- ~1 éve első CVE! - *Előadásnak kevés ...*
+- Saját projektek? - *Ez meg sok ...*
+- Nehézségek? - *Motivációs előadás?*
+
+> Közelebb hozni a kutatást, a köztudathoz <!-- .element: class="fragment" data-fragment-index="1" -->
+
+---
+
+### Mi is az a sérülékenység-kutatás?
+
+Az értelmező szótár alapján:
+
+> … tudományos kérdés megoldása, új tudományos eredményekhez való eljutás végett folytatott tevékenység …
+
+---v
+
+### Mi a cél?
+
+Wikipedia:
+
+> ... egy biztonsági fenyegetés, ami valamely számítógépes alkalmazás olyan sebezhetőségét használja ki, ami még nem került publikálásra, a szoftver fejlesztője nem tud róla ...
+
+---v
+
+### Miért?
+
+- Pénzügyi juttatás - *bug bounty / pwn2own*
+- Láthatóság™ - *Konferenciák, publikáció*
+- Networking - *ügyfelek, `MÁS KUTATÓK!`*
+- Tanulás - *Tudásom nagyobb része projektekből van! A CTF feladatok scope-ja kicsi*
+
+> Élvezeti faktor / szakma szépsége <!-- .element: class="fragment" data-fragment-index="1" -->
+
+---
+
+### Kezdeti nehézségek
+
+Saját tapasztalataim:
+
+- Felkészülés? - *Mit kéne ehhez megtanulni?*
+- Hol kezdjem? - *Mit kéne kutatni?*
+- Hogyan csinálom? - *Nincs step-by-step guide*
+- Nem sikerül? - *Erről nem szól a fáma ...*
+- Social media - *10 post, de nekem nem megy ...*
+
+---v
+
+### Személyes megközelítés
+
+![alt text](static/justdoit.png)
+
+---v
+
+### Személyes megközelítés
+
+- Felkészülés? - *A jelenlegi tudás kellenek*
+- Hol kezdjem? - *A jelenlegi területemen!*
+- Hogyan csinálom? - *Ismerkedés a célponttal*
+- Nem sikerül? - *Tartsunk szünetet!*
+- Social media - *Töröljük le a fenébe ...*
+
+---v
+
+### Kezdeti nehézségek
+
+- Nincs szükség speciális tudásra
+- Nem lehet tanulni (kivéve ha új a terület)
+- Mit csinál az adott célpont? *HOGYAN?*
+- Abbahagyom és folytatom, amikor akarom!
+- Ki kell szűrni a *hasznos* tartalmakat
+
+---
+
 ## TL-WR741ND Router
 ### `RCE`
 
@@ -47,7 +151,7 @@ Firmware "kibontása" (`binwalk` / `unblob`), majd az `init` folyamat vizsgálat
 
 ### Webes felület vizsgálata
 
-"beszédes" végpont nevek, meylekre rá lehet kereseni a binárisban
+"beszédes" endpoint nevek, meylekre rá lehet kereseni a binárisban
 
 ![alt text](static/userrpm.png)
 
@@ -72,16 +176,15 @@ A `string` parancs kimenetében megkerestem ami érdekelt
 
 ### Reverse engineering
 
-Cross ref-ek alapján megnéztem ezek hogy vannak használva
+String cross ref-ek:
 
 ![alt text](static/endpoints.png)
 
 ---v
 
-### Reverse engineering
+### Ghidra script
 
-Ghidra script:
-- Összegyűjti a végpontokat
+- Endpoint csatolások begyűjtése
 - Kattintható label a handler-ekre
 
 ```python
@@ -192,9 +295,9 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 
 ![alt text](static/callchain.png)
 
----
+---v
 
-### Összefoglaló
+### Reverse engineering
 
 <div class="mermaid">
   <pre>
@@ -219,9 +322,9 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 ### Tanulságok
 
 - Ghidra használat
-- Reversing flow gyakorlás (feedback miatt)
-- Validáció gyors teszttel (PoC helyett)
 - Ghidra scripting
+- Reversing flow gyakorlás (feedback miatt)
+- Gyors hack PoC helyett (!maximalizmus)
 
 ---
 
@@ -234,7 +337,7 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 
 - Régen a home infra alapja
 - Open source
-- Pythonban :)
+- Python
 - Egyszer sikerült megölni
 
 ---
@@ -249,12 +352,12 @@ Alternatíva: az `execFormatCmd` alapján bejárni a hívási láncokat
 
 ### Dokumentáció
 
+https://doc.yunohost.org/en/dev/core/architecture
+
 - Moulinette - Actionmap server (API)
 - Yunohost - Users, services, etc
 - SSOwat - SSO
 - Yunohost-portal - Web interface
-
-> https://doc.yunohost.org/en/dev/core/architecture
 
 ---v
 
@@ -344,6 +447,8 @@ class Interface:
 
 ### Kódvizsgálat
 
+Eltérő módon beregisztrált handler!
+
 ```python
 class _ActionsMapPlugin:
   ...
@@ -367,11 +472,8 @@ class _ActionsMapPlugin:
 def login(self):
   params = request.params
   ...
-  else:
-    if "credentials" in params:
-      ...
-    elif "username" in params and "password" in params:
-        ...
+  if "username" in params and "password" in params:
+    ...
     profile = params.get("profile", ...)
   ...
   authenticator = self.actionsmap.get_authenticator(profile)
@@ -433,12 +535,6 @@ def import_module(name, package=None):
 
 ---
 
-### Shodan
-
-![alt text](static/yunohostshodan.png)
-
----
-
 ## TL-Archer AX23 Router
 ### `Fail (?)`
 
@@ -464,9 +560,8 @@ Végül nem is a router lett a fő célpont
 ### Target megismerése
 
 - Firmware vizsgálat
-- Alkalmazása beállítása
+- Alkalmazás beállítása
 - Reverse engineering
-- Firmware vizsgálat
 
 ---
 
@@ -622,18 +717,18 @@ Tényleg sok meló ment bele <!-- .element: class="fragment" data-fragment-index
 - Láttam, hogy sok a CMS vuln
 - "Na MaJd Én Is SzÍjJeLhAcKoLoM"
 - Több célpont közül válaszottam (open source)
-- Frappe (python, értelmezhető kód)
+- Python, értelmezhető kód
 
 ---
 
 ### Target megismerése
 
 - Repo klónozása
-- Az `init` logika értelmezése
-- "Alkalmazás" koncepció vizsgálata
-- Végpont definíciók azonosítása
+- Rendszer indítás
+- "Application" koncepció vizsgálata
+- Endpoint definíciók azonosítása
 
----v
+---
 
 ### Init logika
 
@@ -697,7 +792,7 @@ A [dokumentáció](https://docs.frappe.io/framework/user/en/basics/apps) alapjá
 
 ---
 
-### Végpont definíciók
+### Handler definíciók
 
 Az `app.py` fájlból:
 
@@ -715,7 +810,7 @@ def serve(port=8000, ...):
 
 ---v
 
-### Végpont definíciók
+### Handler definíciók
 
 Az `app.py` fájlból:
 
@@ -734,7 +829,7 @@ def application(request: Request):
 
 ---v
 
-### Végpont definíciók
+### Handler definíciók
 
 Az `api/__init__.py` fájlból:
 
@@ -742,7 +837,8 @@ Az `api/__init__.py` fájlból:
 def handle(request: Request):
   ...
   try:
-    endpoint, arguments = API_URL_MAP.bind_to_environ(request.environ).match()
+    endpoint, arguments = 
+        API_URL_MAP.bind_to_environ(request.environ).match()
   ...
 ```
 
@@ -750,7 +846,7 @@ def handle(request: Request):
 
 ---v
 
-### Végpont definíciók
+### Handler definíciók
 
 Az `api/v2.py` fájlból:
 
@@ -759,28 +855,29 @@ url_rules = [
   ...
   Rule("/discovery", methods=["GET"], endpoint=discovery.root),
   Rule("/discovery/search", methods=["GET"],
-    endpoint=lambda: discovery.search(frappe.form_dict.get("q")),
+    endpoint=lambda: ...search(frappe.form_dict.get("q")),
   ),
-  Rule("/discovery/method", methods=["GET"], endpoint=discovery.methods),
+  Rule("/discovery/method", methods=["GET"], 
+            endpoint=discovery.methods),
   ...
 ```
 
----
+---v
 
-### Összefoglaló
+### Handler definíciók
 
 - Centralizált mechanizmusok
 - Jól meggondolt megoldások
-- Rengeteg idő (~3hét / 1hónap)
-- Feladtam ...
+- ~2hét
+- Meguntam
 
 ---
 
 ### Tanulságok
 
-- Több célpont esetén az ismertebbet támadni
+- Erősségek mentén kutatni
 - Meg kell tanulni feladni ...
-- Nem kötelező tovább folytatni!
+- Nem kötelező folytatni!
 
 ---
 
@@ -799,8 +896,8 @@ url_rules = [
 
 - Már megszállottam kerestem őket ...
 - Véletlen szembejött velem
-- Python
 - Single-file framework
+- Python
 
 ---
 
@@ -811,21 +908,20 @@ url_rules = [
 
 ---
 
-### Végpontok
+### Handler definíciók
 
-```python [ | 10-11]
+```python [ | 5-6,8,10-11]
 class App:
   ...
   async def _asgi_app_http(...):
     ...
-    # Routing
     path: str = scope["path"].lstrip("/")
     parts: List[str] = path.split("/") if path else []
     if hasattr(request, "_route_handler"):
-      func_name: str = request._route_handler
+      fn: str = request._route_handler
     else:
-      func_name: str = parts[0] if parts else "index"
-      if func_name.startswith("_") or func_name.startswith("ws_"):
+      fn: str = parts[0] if parts else "index"
+      if fn.startswith("_") or fn.startswith("ws_"):
         await _early_exit(404, "404 Not Found")
           return
     ...
@@ -833,14 +929,14 @@ class App:
 
 ---v
 
-### Végpontok
+### Handler definíciók
 
-```python [ | 5, 9]
+```python [ | 5, 10]
 ...
 if not request.path_params:
     request.path_params = parts[1:] if len(parts) > 1 else []
 
-... = self._resolve_route_handler(func_name)
+... = self._resolve_route_handler(fn)
 index_handler, _ = self._resolve_route_handler("index")
 ...
 # Execute handler
@@ -849,9 +945,9 @@ try:
     ...
 ```
 
----
+---v
 
-### Összefoglaló
+### Handler definíciók
 
 - Blocklist
 - Nem találtam bypass módszert
@@ -863,12 +959,13 @@ try:
 ### Tanulságok
 
 - Időről időre erre is vissza kéne nézni (?)
-- Kicsit projekt, nagy fun! :)
+- Kicsi projekt, nagy fun! :)
+- Szabad szerda, szabad szombat ...
 
 ---
 
 ## Directus
-### `File write`
+### `CVE`
 
 ---
 
@@ -876,24 +973,24 @@ try:
 
 - Munkahelyi projekt
 - Open source / Javascript
-- 38k+ github star
+- 38k+ github csillag
 
 ---
 
 ### Target megismerése
 
 - Projekt során nincs account
-- Unauth hibák keresése
-- Végpontok és service-ek
+- Unauth. hibák keresése
+- Endpoint-ok és service-ek
 - Auth bypass keresése
 
 ---
 
-### Végpontok / Service-ek
+### Endpoint / Service definíciók
 
 Az `api/src/controllers/files.ts` fájlból:
 
-```js [ | 1,3,9]
+```js
 router.use(checkIsLocked('files'));
 router.get(
 	'/:pk',
@@ -901,11 +998,11 @@ router.get(
 );
 ```
 
-URL formátum: `/files/<pk>`
+`GET /files/88ae61ef-105a-4ccc-...`
 
 ---v
 
-### Végpontok / Service-ek
+### Endpoint / Service definíciók
 
 ```js [ | 4-7,9]
 router.use(checkIsLocked('files'));
@@ -926,7 +1023,7 @@ router.get(
 
 ---v
 
-### Végpontok / Service-ek
+### Endpoint / Service definíciók
 
 <div class="mermaid">
   <pre>
@@ -962,13 +1059,13 @@ export type Accountability = {
 
 ### Auth
 
-```js [|3-4,11-12]
-const extractToken: RequestHandler = (req, _res, next) => {
+```js [|3-4,6,11]
+const extractToken: RequestHandler = (req, _res, next) =>
  
   if (req.headers && req.headers.authorization) {
-  const parts = req.headers.authorization.split(' ');
+  const parts = req.headers.authorization.split(' ')
   
-  if (parts.length === 2 && parts[0]!.lower() === 'bearer') {
+  if (parts.length == 2 && parts[0]!.lower() === 'bearer')
 	  ...
 	  token = parts[1]!;
   }
@@ -1016,7 +1113,7 @@ const service = new FilesService({
 1. `Authorization` header
 2. `Bearer` token
 3. `getAccountabilityForToken(token)`
-4. `FileService(accountability)` 
+4. `FileService(accountability...)` 
 
 ---v
 
@@ -1028,7 +1125,7 @@ const service = new FilesService({
     Browser ->> Directus:
     Note over Directus: Accountability
     Directus--> EndpointHandler: 
-    EndpointHandler->>Service: Instantiate(accountability)
+    EndpointHandler->>Service: Instantiate(accountability...)
     Note over EndpointHandler: Preprocessing
     EndpointHandler->>Service: Invoke
     Note over Service: Acc. check
@@ -1129,7 +1226,7 @@ const ext = path.extname(metadata.filename_download!) ...
 metadata.filename_disk ||= primaryKey + (fileExtension || '');
 
 if (... path.extname(metadata.filename_disk!) !== ext)
-    metadata.filename_disk = primaryKey + (fileExtension || ''); }
+    metadata.filename_disk = primaryKey + (fileExtension || '');}
 ...
 const tempFilenameDisk = 'temp_' + metadata.filename_disk;
 
@@ -1167,3 +1264,117 @@ if (isReplacement === true)
 - [CVE-2025-55746](https://github.com/directus/directus/security/advisories/GHSA-mv33-9f6j-pfmc) (CVSS 9.8)
 - Szikra az utolsó utáni pillanatban
 - A korábbi kutatások ide vezettek
+
+---
+
+### Összesítés / Bátorítás
+
+- **6 önálló projekt**
+  - 1 CVE [CVE-2025-55746](https://github.com/directus/directus/security/advisories/GHSA-mv33-9f6j-pfmc)
+  - 1 !CVE [NotCVE-2026-0005](https://notcve.org/notcve/NotCVE-2026-0005)
+- **~40 munkahelyi projekt**
+  - 6-7 Zero-click RCE
+
+---
+
+## Módszertan / Tanulságok
+
+---
+
+### Módszertan / Tanulságok
+
+- Ahány kutató, annyi megközelítés
+- Nincs 101 kéziköny
+- Saját tapasztalataim
+
+---v
+
+### JUST DO IT
+
+- A kutatás olyan, mint egy izom
+- Minél többet használjuk, annál erősebb lesz!
+- Tanulható skill!
+- Atomikus koncepciókhoz jó a CTF
+- A kutatás más képességeket igényel és fejleszt
+- Reverse engineering-hez kell egy jó target
+
+> `Az vagy, amit csinálsz`
+
+---v
+
+### A szikra
+
+- A sérülékenység egy robbanás
+- A kritikus tömeghez kell egy szikra
+- Kritikus tömeg: vizsgálódás / analízis
+- Szikra: ?
+
+> `Mikor mást csinálunk!`
+
+---v
+
+### Low hanging fruit
+
+- Légből kapott ötlet > N+1 struktúrált lépés
+- Ütni kell a vasat, amíg meleg
+- Nem kell nagy, világot megváltó gondolat!
+- Az "elég jó" elhagyása a "tökéletesért"
+
+> `Általában máshova érünk célba`
+
+---v
+
+### Dokumentáció
+
+- Szünetek miatt kikopik az emlék
+- Segít a rendszer megértésében
+- Különösen az ábrák!
+- Különösen összetettebb támadások esetén ...
+- Segít együttműködni csapattagokkal
+- Publikálni is egyszerűbb
+
+> `Nekem segít fókuszálni ...`
+
+---v
+
+### Mikor végzünk?
+
+- A legnagyobb tanulság, amit eddig levontam
+- A szikra mindig akkor jött, mikor már feladtam
+- Talán minden prekoncepciót levedlettem?
+- Rutinná vállt, hogy hagyom "érni" a gondolatokat
+
+> `Vissza is lehet térni!`
+
+---v
+
+### Minden információmorzsa számító
+
+- Nyitott szem és fül a világban
+- Egy jó ötlet a gyakornoktól is jöhet
+- Vagy egy blogposztból!
+- Érdemes gyűjteni a releváns cikkeket!
+
+> `If it works, It's not stupid`
+
+---v
+
+### Have fun!
+
+- Közösség, meme gyártás, fun!
+- A végeláthatatlan agyalás az agent dolga
+- Esélyes, hogy nem fizetnek, szóval élvezd!
+
+> TODO - Herkules kép :)
+
+---v
+
+### Erősségek
+
+- Szakterület / hobbi alapján haladjunk
+- Használjuk a hazai pálya előnyeit
+- Más területeken is keressük az ismert utat!
+
+> `Be water :)`
+
+---v
